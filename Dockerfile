@@ -16,3 +16,5 @@ RUN cd "$GOPATH/src/github.com/dreyk/kube-nfs-proxy" \
     && /glide/glide install
 
 RUN go install "github.com/dreyk/kube-nfs-proxy"
+
+CMD [ "kube-nfs-proxy" ]

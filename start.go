@@ -2,18 +2,19 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/efs"
 	"io/ioutil"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api/resource"
 	api_v1 "k8s.io/client-go/pkg/api/v1"
 	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"net/http"
 	"os"
-	"flag"
 )
 
 var (
@@ -24,12 +25,12 @@ var (
 )
 
 func main() {
-	flag.StringVar(&path,"path",os.Getenv("NFS_PATH"),"NFS Mount path")
-	flag.StringVar(&region,"region",os.Getenv("AWS_REGION"),"AWS region")
-	flag.StringVar(&name,"name",os.Getenv("NFS_NAME"),"NFS Mount name")
-	flag.StringVar(&namespace,"ns",os.Getenv("NFS_NAMESPACE"),"NFS namespace")
+	flag.StringVar(&path, "path", os.Getenv("NFS_PATH"), "NFS Mount path")
+	flag.StringVar(&region, "region", os.Getenv("AWS_REGION"), "AWS region")
+	flag.StringVar(&name, "name", os.Getenv("NFS_NAME"), "NFS Mount name")
+	flag.StringVar(&namespace, "ns", os.Getenv("NFS_NAMESPACE"), "NFS namespace")
 	flag.Parse()
-	if region==""{
+	if region == "" {
 		panic("region is empty")
 	}
 	efss := efs.New(session.New(), &aws.Config{Region: aws.String(region)})
@@ -99,6 +100,10 @@ func mount(ip string) {
 	labels := map[string]string{
 		"nfs-name": name,
 	}
+	q, err := resource.ParseQuantity("10240Mi")
+	if err != nil {
+		panic("Can't parse quantati:" + err.Error())
+	}
 	_, err = clientset.PersistentVolumes().Create(&api_v1.PersistentVolume{
 		ObjectMeta: api_v1.ObjectMeta{
 			Name:      name,
@@ -106,8 +111,10 @@ func mount(ip string) {
 			Namespace: namespace,
 		},
 		Spec: api_v1.PersistentVolumeSpec{
-
 			AccessModes: []api_v1.PersistentVolumeAccessMode{api_v1.ReadWriteMany},
+			Capacity: map[api_v1.ResourceName]resource.Quantity{
+				api_v1.ResourceName("storage"): q,
+			},
 			PersistentVolumeSource: api_v1.PersistentVolumeSource{
 				NFS: &api_v1.NFSVolumeSource{
 					Path:     path,
@@ -128,6 +135,11 @@ func mount(ip string) {
 		},
 		Spec: api_v1.PersistentVolumeClaimSpec{
 			AccessModes: []api_v1.PersistentVolumeAccessMode{api_v1.ReadWriteMany},
+			Resources: api_v1.ResourceRequirements{
+				Requests: map[api_v1.ResourceName]resource.Quantity{
+					api_v1.ResourceName("storage"): q,
+				},
+			},
 			Selector: &meta_v1.LabelSelector{
 				MatchLabels: labels,
 			},

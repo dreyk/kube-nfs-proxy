@@ -9,7 +9,7 @@ RUN mkdir /glide \
     && rm -rf linux-386
 
 RUN mkdir -p "$GOPATH/src/github.com/dreyk/kube-nfs-proxy"
-COPY ./start.go "$GOPATH/src/github.com/dreyk/kube-nfs-proxy/start/go"
+COPY ./start.go "$GOPATH/src/github.com/dreyk/kube-nfs-proxy/start.go"
 COPY ./glide* "$GOPATH/src/github.com/dreyk/kube-nfs-proxy/"
 
 RUN cd "$GOPATH/src/github.com/dreyk/kube-nfs-proxy" \

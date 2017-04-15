@@ -33,6 +33,9 @@ func main() {
 	if region == "" {
 		panic("region is empty")
 	}
+	if maybeExit(){
+		return
+	}
 	efss := efs.New(session.New(), &aws.Config{Region: aws.String(region)})
 	nfs, err := efss.DescribeFileSystems(&efs.DescribeFileSystemsInput{
 		CreationToken: &name,
@@ -88,6 +91,25 @@ func target(efss *efs.EFS, id string) {
 	mount(*target.IpAddress)
 
 }
+func maybeExit() bool{
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		panic("Can't get kubernetes client:" + err.Error())
+	}
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		panic("Can't get kubernetes client:" + err.Error())
+	}
+	_, err = clientset.PersistentVolumes().Get(name,meta_v1.GetOptions{})
+	if err!=nil{
+		return false
+	}
+	_, err = clientset.PersistentVolumeClaims(namespace).Get(name,meta_v1.GetOptions{})
+	if err!=nil{
+		return false
+	}
+	return true
+}
 func mount(ip string) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -104,49 +126,53 @@ func mount(ip string) {
 	if err != nil {
 		panic("Can't parse quantati:" + err.Error())
 	}
-	_, err = clientset.PersistentVolumes().Create(&api_v1.PersistentVolume{
-		ObjectMeta: api_v1.ObjectMeta{
-			Name:      name,
-			Labels:    labels,
-			Namespace: namespace,
-		},
-		Spec: api_v1.PersistentVolumeSpec{
-			AccessModes: []api_v1.PersistentVolumeAccessMode{api_v1.ReadWriteMany},
-			Capacity: map[api_v1.ResourceName]resource.Quantity{
-				api_v1.ResourceName("storage"): q,
+	if _, err := clientset.PersistentVolumes().Get(name,meta_v1.GetOptions{});err!=nil {
+		_, err = clientset.PersistentVolumes().Create(&api_v1.PersistentVolume{
+			ObjectMeta: api_v1.ObjectMeta{
+				Name:      name,
+				Labels:    labels,
+				Namespace: namespace,
 			},
-			PersistentVolumeSource: api_v1.PersistentVolumeSource{
-				NFS: &api_v1.NFSVolumeSource{
-					Path:     path,
-					ReadOnly: false,
-					Server:   ip,
-				},
-			},
-		},
-	})
-	if err != nil {
-		panic("Can't create persistance volume:" + err.Error())
-	}
-	_, err = clientset.PersistentVolumeClaims(namespace).Create(&api_v1.PersistentVolumeClaim{
-		ObjectMeta: api_v1.ObjectMeta{
-			Name:      name,
-			Labels:    labels,
-			Namespace: namespace,
-		},
-		Spec: api_v1.PersistentVolumeClaimSpec{
-			AccessModes: []api_v1.PersistentVolumeAccessMode{api_v1.ReadWriteMany},
-			Resources: api_v1.ResourceRequirements{
-				Requests: map[api_v1.ResourceName]resource.Quantity{
+			Spec: api_v1.PersistentVolumeSpec{
+				AccessModes: []api_v1.PersistentVolumeAccessMode{api_v1.ReadWriteMany},
+				Capacity: map[api_v1.ResourceName]resource.Quantity{
 					api_v1.ResourceName("storage"): q,
 				},
+				PersistentVolumeSource: api_v1.PersistentVolumeSource{
+					NFS: &api_v1.NFSVolumeSource{
+						Path:     path,
+						ReadOnly: false,
+						Server:   ip,
+					},
+				},
 			},
-			Selector: &meta_v1.LabelSelector{
-				MatchLabels: labels,
+		})
+		if err != nil {
+			panic("Can't create persistance volume:" + err.Error())
+		}
+	}
+	if _, err := clientset.PersistentVolumeClaims(namespace).Get(name,meta_v1.GetOptions{});err!=nil {
+		_, err = clientset.PersistentVolumeClaims(namespace).Create(&api_v1.PersistentVolumeClaim{
+			ObjectMeta: api_v1.ObjectMeta{
+				Name:      name,
+				Labels:    labels,
+				Namespace: namespace,
 			},
-		},
-	})
-	if err != nil {
-		panic("Can't create persistance volume claim:" + err.Error())
+			Spec: api_v1.PersistentVolumeClaimSpec{
+				AccessModes: []api_v1.PersistentVolumeAccessMode{api_v1.ReadWriteMany},
+				Resources: api_v1.ResourceRequirements{
+					Requests: map[api_v1.ResourceName]resource.Quantity{
+						api_v1.ResourceName("storage"): q,
+					},
+				},
+				Selector: &meta_v1.LabelSelector{
+					MatchLabels: labels,
+				},
+			},
+		})
+		if err != nil {
+			panic("Can't create persistance volume claim:" + err.Error())
+		}
 	}
 }
 

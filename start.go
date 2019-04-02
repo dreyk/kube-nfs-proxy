@@ -3,18 +3,19 @@ package main
 import (
 	"errors"
 	"flag"
+	"io/ioutil"
+	"net/http"
+	"os"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/efs"
-	"io/ioutil"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/resource"
 	api_v1 "k8s.io/client-go/pkg/api/v1"
 	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
-	"net/http"
-	"os"
 )
 
 var (
@@ -33,7 +34,7 @@ func main() {
 	if region == "" {
 		panic("region is empty")
 	}
-	if maybeExit(){
+	if maybeExit() {
 		return
 	}
 	efss := efs.New(session.New(), &aws.Config{Region: aws.String(region)})
@@ -91,7 +92,7 @@ func target(efss *efs.EFS, id string) {
 	mount(*target.IpAddress)
 
 }
-func maybeExit() bool{
+func maybeExit() bool {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		panic("Can't get kubernetes client:" + err.Error())
@@ -100,12 +101,12 @@ func maybeExit() bool{
 	if err != nil {
 		panic("Can't get kubernetes client:" + err.Error())
 	}
-	_, err = clientset.PersistentVolumes().Get(name,meta_v1.GetOptions{})
-	if err!=nil{
+	_, err = clientset.PersistentVolumes().Get(name, meta_v1.GetOptions{})
+	if err != nil {
 		return false
 	}
-	_, err = clientset.PersistentVolumeClaims(namespace).Get(name,meta_v1.GetOptions{})
-	if err!=nil{
+	_, err = clientset.PersistentVolumeClaims(namespace).Get(name, meta_v1.GetOptions{})
+	if err != nil {
 		return false
 	}
 	return true
@@ -126,7 +127,7 @@ func mount(ip string) {
 	if err != nil {
 		panic("Can't parse quantati:" + err.Error())
 	}
-	if _, err := clientset.PersistentVolumes().Get(name,meta_v1.GetOptions{});err!=nil {
+	if _, err := clientset.PersistentVolumes().Get(name, meta_v1.GetOptions{}); err != nil {
 		_, err = clientset.PersistentVolumes().Create(&api_v1.PersistentVolume{
 			ObjectMeta: api_v1.ObjectMeta{
 				Name:      name,
@@ -151,15 +152,17 @@ func mount(ip string) {
 			panic("Can't create persistance volume:" + err.Error())
 		}
 	}
-	if _, err := clientset.PersistentVolumeClaims(namespace).Get(name,meta_v1.GetOptions{});err!=nil {
+	if _, err := clientset.PersistentVolumeClaims(namespace).Get(name, meta_v1.GetOptions{}); err != nil {
 		_, err = clientset.PersistentVolumeClaims(namespace).Create(&api_v1.PersistentVolumeClaim{
 			ObjectMeta: api_v1.ObjectMeta{
-				Name:      name,
-				Labels:    labels,
-				Namespace: namespace,
+				Name:        name,
+				Labels:      labels,
+				Namespace:   namespace,
+				Annotations: map[string]string{"volume.alpha.kubernetes.io/storage-class": "anything"},
 			},
 			Spec: api_v1.PersistentVolumeClaimSpec{
 				AccessModes: []api_v1.PersistentVolumeAccessMode{api_v1.ReadWriteMany},
+
 				Resources: api_v1.ResourceRequirements{
 					Requests: map[api_v1.ResourceName]resource.Quantity{
 						api_v1.ResourceName("storage"): q,

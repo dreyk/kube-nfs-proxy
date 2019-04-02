@@ -175,8 +175,8 @@ func mount(ip string) {
 		})
 		if err != nil {
 			panic("Can't create persistance volume claim:" + err.Error())
-		}*/
-	}
+		}
+	}*/
 }
 
 func mountConfig() *efs.CreateMountTargetInput {

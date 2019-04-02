@@ -152,7 +152,7 @@ func mount(ip string) {
 			panic("Can't create persistance volume:" + err.Error())
 		}
 	}
-	if _, err := clientset.PersistentVolumeClaims(namespace).Get(name, meta_v1.GetOptions{}); err != nil {
+	/*if _, err := clientset.PersistentVolumeClaims(namespace).Get(name, meta_v1.GetOptions{}); err != nil {
 		_, err = clientset.PersistentVolumeClaims(namespace).Create(&api_v1.PersistentVolumeClaim{
 			ObjectMeta: api_v1.ObjectMeta{
 				Name:        name,
@@ -175,7 +175,7 @@ func mount(ip string) {
 		})
 		if err != nil {
 			panic("Can't create persistance volume claim:" + err.Error())
-		}
+		}*/
 	}
 }
 
